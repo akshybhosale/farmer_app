@@ -9,18 +9,37 @@ import javax.persistence.Table;
 
 @Entity
 @Table(name = "admin_table")
-public class Admin {
 
+public class Admin {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
+    public String getPassword() {
+		return password;
+	}
+	public void setPassword(String password) {
+		this.password = password;
+	}
+	@Override
+	public String toString() {
+		return "Admin [id=" + id + ", password=" + password + ", userId=" + userId + ", fname=" + fname + ", lname="
+				+ lname + ", email=" + email + ", mobile=" + mobile + ", place=" + place + ", role=" + role + "]";
+	}
+	private String password;
     private Long userId;
     private String fname;
     private String lname;
     private String email;
     private String mobile;
     private String place;
+    public String getRole() {
+		return role;
+	}
+	public void setRole(String role) {
+		this.role = role;
+	}
+	private String role;
+
 
     // Getters and setters
     public Long getId() { return id; }

@@ -1,11 +1,14 @@
 package com.farmer.fullstack.controller;
 
 import com.farmer.fullstack.model.User;
+import com.farmer.fullstack.model.Customer;
+import com.farmer.fullstack.model.Farmer;
 import com.farmer.fullstack.security.JwtUtil;
 import com.farmer.fullstack.service.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -23,19 +26,24 @@ public class AuthController {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
+
     // ✅ REGISTER USER
     @PostMapping("/register")
     public ResponseEntity<Map<String, Object>> register(@RequestBody User user) {
-    	System.out.println("regi>>>" + user);
+        System.out.println("regi>>>" + user);
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // Check if user already exists
             if (authService.isUserExists(user.getEmail())) {
                 response.put("success", false);
                 response.put("message", "User already registered with this email.");
                 return new ResponseEntity<>(response, HttpStatus.CONFLICT);
             }
+
+            // Encrypt password before saving
+            user.setPassword(passwordEncoder.encode(user.getPassword()));
 
             User savedUser = authService.register(user);
             response.put("success", true);
@@ -58,21 +66,65 @@ public class AuthController {
         try {
             String email = request.get("email");
             String password = request.get("password");
+            String role = request.get("role");
 
-            Optional<User> userOpt = authService.login(email, password);
-            if (!userOpt.isPresent()) {   // ✅ Java 8 friendly
+            System.out.println("Login Attempt: " + email + " | Role: " + role);
+
+            if (role == null || role.isEmpty()) {
                 response.put("success", false);
-                response.put("message", "Invalid email or password.");
+                response.put("message", "Role is required.");
+                return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+            }
+
+            Optional<?> userOpt;
+
+            switch (role.toLowerCase()) {
+            case "admin":
+                userOpt = authService.loginAdmin(email, password);
+                break;
+            case "customer":
+                userOpt = authService.loginCustomer(email, password);
+                break;
+            case "farmer":
+                userOpt = authService.loginFarmer(email, password);
+                break;
+            default:
+                response.put("success", false);
+                response.put("message", "Invalid role.");
+                return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        }
+
+            if (!userOpt.isPresent()) {
+                response.put("success", false);
+                response.put("message", "Invalid email or password for " + role);
                 return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
             }
 
+            Object user = userOpt.get();
 
-            User user = userOpt.get();
-            String token = jwtUtil.generateToken(user.getEmail());
+            // Get stored hashed password
+            String storedHashedPassword = "";
+            if (user instanceof User) {
+                storedHashedPassword = ((User) user).getPassword();
+            } else if (user instanceof Customer) {
+                storedHashedPassword = ((Customer) user).getPassword();
+            } else if (user instanceof Farmer) {
+                storedHashedPassword = ((Farmer) user).getPassword();
+            }
+
+            // Check password
+            if (!passwordEncoder.matches(password, storedHashedPassword)) {
+                response.put("success", false);
+                response.put("message", "Invalid email or password for " + role);
+                return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+            }
+
+            String token = jwtUtil.generateToken(email);
 
             response.put("success", true);
             response.put("message", "Login successful.");
             response.put("token", token);
+            response.put("role", role);
             response.put("user", user);
 
             return new ResponseEntity<>(response, HttpStatus.OK);

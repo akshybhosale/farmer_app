@@ -26,6 +26,13 @@ public class Farmer {
     private String mobile;
     private String place;
     private String role;
+    public String getPassword() {
+		return password;
+	}
+	public void setPassword(String password) {
+		this.password = password;
+	}
+	private String password;
     
     public String getRole() {
 		return role;
